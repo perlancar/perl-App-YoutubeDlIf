@@ -11,6 +11,7 @@ use warnings;
 use Log::ger;
 
 use IPC::System::Options qw(system readpipe);
+use Regexp::Pattern::YouTube;
 use YouTube::Util;
 
 our %SPEC;
@@ -113,13 +114,14 @@ _
             tags => ['category:filtering'],
         },
         if_duration_not_longer_than => {
-            schema => 'duration*',
+            #schema => 'duration*',
+            schema => 'str*',
             tags => ['category:filtering'],
         },
     },
-    rels => [
+    args_rels => {
         dep_any => [log_file => ['if_not_yet']],
-    ],
+    },
     deps => {
         prog => 'youtube-dl',
     },
@@ -127,34 +129,44 @@ _
 sub youtube_dl_if {
     my %args = @_;
 
+    my $re_video_id = $Regexp::Pattern::YouTube::RE{video_id}{pat} or die;
+    $re_video_id = qr/\A$re_video_id\z/;
+    #use DD; dd $re_video_id;
+
     my @argv_for_youtube_dl;
+  ARG:
     for my $arg (@{$args{urls_or_ids}}) {
-        my $video_id = YouTube::Util::extract_youtube_video_id($arg);
-        if ($video_id) {
-            log_trace "Argument %s has video ID %s", $arg, $video_id;
-            if ($args{if_not_yet}) {
-                if (my $filename = _search_id_in_log_file($video_id, $args{log_file})) {
-                    log_info "Argument %s (video ID %s) has been downloaded (%s), skipped", $arg, $video_id, $filename;
-                    next;
-                } else {
-                    log_trace "Argument %s (video ID %s) is not in downloaded list", $arg, $video_id;
+      FILTER: {
+            # looks like an option name
+            last FILTER if $arg =~ /\A--?\w+/ && $arg !~ $re_video_id;
+
+            my $video_id = YouTube::Util::extract_youtube_video_id($arg);
+            if ($video_id) {
+                log_trace "Argument %s has video ID %s", $arg, $video_id;
+                if ($args{if_not_yet}) {
+                    if (my $filename = _search_id_in_log_file($video_id, $args{log_file})) {
+                        log_info "Argument %s (video ID %s) has been downloaded (%s), skipped", $arg, $video_id, $filename;
+                        next ARG;
+                    } else {
+                        log_trace "Argument %s (video ID %s) is not in downloaded list", $arg, $video_id;
+                    }
                 }
             }
-        }
-        if (defined $args{if_duration_not_shorter_than} || defined $args{if_duration_not_longer_than}) {
-            my $min_secs = _dur2sec($args{if_duration_not_shorter_than});
-            my $max_secs = _dur2sec($args{if_duration_not_longer_than});
-            my $video_dur = readpipe({log=>1, die=>1}, "youtube-dl --no-playlist '$arg' 2>/dev/null");
-            my $video_secs = _du2sec($video_dur);
-            if (defined $min_secs && $video_secs < $min_secs) {
-                log_info "Argument %s (video ID %s, duration %s) is too short (min %s), skipped", $arg, $video_id, $video_dur, $args{if_duration_not_shorter_than};
-                next;
+            if (defined $args{if_duration_not_shorter_than} || defined $args{if_duration_not_longer_than}) {
+                my $min_secs = _dur2sec($args{if_duration_not_shorter_than});
+                my $max_secs = _dur2sec($args{if_duration_not_longer_than});
+                my $video_dur = readpipe({log=>1, die=>1}, "youtube-dl --no-playlist --get-duration -- '$arg' 2>/dev/null");
+                my $video_secs = _dur2sec($video_dur);
+                if (defined $min_secs && $video_secs < $min_secs) {
+                    log_info "Argument %s (video ID %s, duration %s) is too short (min %s), skipped", $arg, $video_id, $video_dur, $args{if_duration_not_shorter_than};
+                    next ARG;
+                }
+                if (defined $max_secs && $video_secs > $max_secs) {
+                    log_info "Argument %s (video ID %s, duration %s) is too long (min %s), skipped", $arg, $video_id, $video_dur, $args{if_duration_not_longer_than};
+                    next ARG;
+                }
             }
-            if (defined $max_secs && $video_secs > $max_secs) {
-                log_info "Argument %s (video ID %s, duration %s) is too long (min %s), skipped", $arg, $video_id, $video_dur, $args{if_duration_not_longer_than};
-                next;
-            }
-        }
+        } # FILTER
         push @argv_for_youtube_dl, $arg;
     }
 
