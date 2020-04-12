@@ -120,7 +120,7 @@ _
         },
     },
     args_rels => {
-        dep_any => [log_file => ['if_not_yet']],
+        #dep_any => [log_file => ['if_not_yet']], # XXX currently will fail if if_not_yet not specified because of the log_file's default
     },
     deps => {
         prog => 'youtube-dl',
