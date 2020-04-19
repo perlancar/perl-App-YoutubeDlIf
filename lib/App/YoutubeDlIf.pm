@@ -77,8 +77,14 @@ or:
 
     U9v2S49sHeQ
 
-When a video ID is found then it is assumed to be already downloaded in the past
-and will not be downloaded again.
+When a video ID in the argument is found then it is assumed to be already
+downloaded in the past and will not be downloaded again.
+
+Limitations: youtube ID is currently only looked up in arguments, so if you
+download a playlist, the items in the playlist are not checked against the ID's
+in the log file. Another limitation is that you currently have to maintain the
+log file yourself, e.g. by using 'ls -l >> ~/download-logs.org' everytime you
+finish downloading files.
 
 _
         tags => ['category:filtering'],
