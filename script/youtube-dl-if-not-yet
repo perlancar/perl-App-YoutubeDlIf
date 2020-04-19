@@ -1,0 +1,25 @@
+#!perl
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
+# FRAGMENT id=shcompgen-hint command=_youtube-dl
+
+use 5.010001;
+use strict;
+use warnings;
+
+use Perinci::CmdLine::Any;
+
+Perinci::CmdLine::Any->new(
+    url => '/App/YoutubeDlIf/youtube_dl_if_not_yet',
+    log => 1,
+    log_level => 'info',
+    read_config => 0,
+    read_env => 0,
+    allow_unknown_opts => 1,
+)->run;
+
+# PODNAME:
+# ABSTRACT:

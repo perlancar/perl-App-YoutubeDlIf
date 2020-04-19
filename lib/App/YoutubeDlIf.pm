@@ -16,6 +16,75 @@ use YouTube::Util;
 
 our %SPEC;
 
+our %args_common = (
+    urls_or_ids => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'url_or_id',
+        schema => ['array*', of=>'str*', min_len=>1],
+        req => 1,
+        pos => 0,
+        greedy => 1,
+    },
+    log_file => {
+        summary => 'File that contains list of download filenames',
+        schema => 'str*', # XXX filename
+        default => do {
+            my $path;
+            my @paths = (
+                "$ENV{HOME}/notes/download-logs.org",
+                "$ENV{HOME}/download-logs.org",
+            );
+            for my $p (@paths) {
+                if (-f $p) {
+                    $path = $p; last;
+                }
+            }
+            die "Cannot find download log file, please specify using ".
+                "--log-file or put the log file in one of: ".
+                (join ", ", @paths) unless $path;
+            $path;
+        },
+    },
+    if_duration_not_shorter_than => {
+        #schema => 'duration*', # XXX duration coercer parses 01:00 as 1 hour 0 minutes instead of 1 minute 0 seconds
+        schema => 'str*',
+        tags => ['category:filtering'],
+    },
+    if_duration_not_longer_than => {
+        #schema => 'duration*',
+        schema => 'str*',
+        tags => ['category:filtering'],
+    },
+);
+
+our %arg_if_not_yet = (
+    if_not_yet => {
+        summary => 'If set, only download videos that are not yet downloaded',
+        schema => 'bool',
+        description => <<'_',
+
+When set to true, youtube-dl-if will first extract downloaded video ID's from
+filenames or URL's or video ID's listed in a text file (specified via
+`--log-file`), e.g.:
+
+    35682594        Table Tennis Shots- If Were Not Filmed, Nobody Would Believe [HD]-dUjxqFbWzQo.mp4       date:[2019-12-29 ]
+
+or:
+
+    https://www.youtube.com/embed/U9v2S49sHeQ?rel=0
+
+or:
+
+    U9v2S49sHeQ
+
+When a video ID is found then it is assumed to be already downloaded in the past
+and will not be downloaded again.
+
+_
+        tags => ['category:filtering'],
+    },
+);
+
 sub _search_id_in_log_file {
     my ($id, $path) = @_;
 
@@ -55,69 +124,8 @@ This is a wrapper for **youtube-dl**.
 
 _
     args => {
-        urls_or_ids => {
-            'x.name.is_plural' => 1,
-            'x.name.singular' => 'url_or_id',
-            schema => ['array*', of=>'str*', min_len=>1],
-            req => 1,
-            pos => 0,
-            greedy => 1,
-        },
-        log_file => {
-            summary => 'File that contains list of download filenames',
-            schema => 'str*', # XXX filename
-            default => do {
-                my $path;
-                my @paths = (
-                    "$ENV{HOME}/notes/download-logs.org",
-                    "$ENV{HOME}/download-logs.org",
-                );
-                for my $p (@paths) {
-                    if (-f $p) {
-                        $path = $p; last;
-                    }
-                }
-                die "Cannot find download log file, please specify using ".
-                    "--log-file or put the log file in one of: ".
-                    (join ", ", @paths) unless $path;
-                $path;
-            },
-        },
-        if_not_yet => {
-            summary => 'If set, only download videos that are not yet downloaded',
-            schema => 'bool',
-            description => <<'_',
-
-When set to true, youtube-dl-if will first extract downloaded video ID's from
-filenames or URL's or video ID's listed in a text file (specified via
-`--log-file`), e.g.:
-
-    35682594        Table Tennis Shots- If Were Not Filmed, Nobody Would Believe [HD]-dUjxqFbWzQo.mp4       date:[2019-12-29 ]
-
-or:
-
-    https://www.youtube.com/embed/U9v2S49sHeQ?rel=0
-
-or:
-
-    U9v2S49sHeQ
-
-When a video ID is found then it is assumed to be already downloaded in the past
-and will not be downloaded again.
-
-_
-            tags => ['category:filtering'],
-        },
-        if_duration_not_shorter_than => {
-            #schema => 'duration*', # XXX duration coercer parses 01:00 as 1 hour 0 minutes instead of 1 minute 0 seconds
-            schema => 'str*',
-            tags => ['category:filtering'],
-        },
-        if_duration_not_longer_than => {
-            #schema => 'duration*',
-            schema => 'str*',
-            tags => ['category:filtering'],
-        },
+        %args_common,
+        %arg_if_not_yet,
     },
     args_rels => {
         #dep_any => [log_file => ['if_not_yet']], # XXX currently will fail if if_not_yet not specified because of the log_file's default
@@ -172,6 +180,30 @@ sub youtube_dl_if {
 
     system({log=>1, die=>1}, "youtube-dl", @argv_for_youtube_dl);
     [200];
+}
+
+$SPEC{youtube_dl_if_not_yet} = {
+    v => 1.1,
+    summary => 'Download videos using youtube-dl if not already downloaded',
+    description => <<'_',
+
+This is a shortcut for:
+
+    % youtube-dl-if --if-not-yet ...
+
+_
+    args => {
+        %args_common,
+    },
+    args_rels => {
+    },
+    deps => {
+        prog => 'youtube-dl',
+    },
+};
+sub youtube_dl_if_not_yet {
+    my %args = @_;
+    youtube_dl_if(if_not_yet=>1, %args);
 }
 
 1;
