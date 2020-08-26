@@ -55,6 +55,10 @@ our %args_common = (
         schema => 'str*',
         tags => ['category:filtering'],
     },
+    restart_if_no_output_after => {
+        schema => 'duration*',
+        tags => ['category:restart'],
+    },
 );
 
 our %arg_if_not_yet = (
@@ -184,7 +188,18 @@ sub youtube_dl_if {
         push @argv_for_youtube_dl, $arg;
     }
 
-    system({log=>1, die=>1}, "youtube-dl", @argv_for_youtube_dl);
+    my $do_govern;
+
+    $do_govern = 1 if defined $args{restart_if_no_output_after};
+
+    if ($do_govern) {
+        my @opts_for_govern;
+        push @opts_for_govern, "--restart-if-no-output-after", $args{restart_if_no_output_after}
+            if defined $args{restart_if_no_output_after};
+        system({log=>1, die=>1}, "govproc", @opts_for_govern, "--", "youtube-dl", @argv_for_youtube_dl);
+    } else {
+        system({log=>1, die=>1}, "youtube-dl", @argv_for_youtube_dl);
+    }
     [200];
 }
 
